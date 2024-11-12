@@ -32,12 +32,7 @@ class Searcher:
     該類的功能是負責進行網路爬蟲，彙整資料並提交
     '''
     def __init__(self) -> None:
-
-        #陽明課程時間表的網頁
-        url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
-
-        self.__activate_driver()
-        self.__goto_url(url)
+        pass
 
     def __activate_driver(self) -> None:
         '''
@@ -156,26 +151,29 @@ class Searcher:
             return courses
         
         return None
+    
+    def __enter__(self):
+        #陽明課程時間表的網頁
+        url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
+        self.__activate_driver()
+        self.__goto_url(url)
+        return self
 
-    def quit(self) -> None:
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         '''
         關閉driver
         '''
         self.driver.quit()
 
 def main():
-    searcher = Searcher()
-    try:
-        print(searcher.get_courses("M5"))
-        print(searcher.get_courses("T5"))
-        print(searcher.get_courses("W5"))
-        print(searcher.get_courses("R5"))
-        print(searcher.get_courses("F5"))
-    except Exception as e:
-        print(e)
-    #driver一定要被正常關閉，否則下次運行絕對會出bug
-    finally:
-        searcher.quit()
+    with Searcher() as searcher:
+        l = ["M5","T5","W5","R5","F5"]
+        try:
+            for i in l:
+                print(searcher.get_courses(i))
+            
+        except Exception as e:
+            print(e)
 
 if __name__ == "__main__":
     main()

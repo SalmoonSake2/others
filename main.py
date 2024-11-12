@@ -9,11 +9,11 @@ main.py
 作者
 -------------------------------------------------
 Salmoon Sake
-...
+在此感謝 曾宗宣 的協助，建議將其改為更易使用的Context Maneger
 
 版本資訊
 -------------------------------------------------
-v1.0
+v1.1
 '''
 from time import sleep
 
@@ -34,10 +34,15 @@ class Searcher:
     def __init__(self) -> None:
 
         #陽明課程時間表的網頁
-        url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
+        self.url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
 
         self.__activate_driver()
-        self.__goto_url(url)
+
+    def __enter__(self) -> 'Searcher':
+        return self
+
+    def __exit__(self,type,value,traceback) -> None:
+        self.driver.quit()
 
     def __activate_driver(self) -> None:
         '''
@@ -82,6 +87,8 @@ class Searcher:
         if time_slot[1] not in "yz1234n56789abcd":
             raise Exception("不存在的時段代碼")
 
+        self.__goto_url(self.url)
+
         #設置為陽明校區
         chkCampus = self.wait.until(EC.visibility_of_element_located((By.ID, "chkCampus")))
         chkCampus.click()
@@ -111,8 +118,6 @@ class Searcher:
         crstime_search = self.wait.until(EC.visibility_of_element_located((By.ID, "crstime_search")))
         crstime_search.click()
 
-        succeed = False
-
         #從網頁中篩選出課程列表物件
         sleep(2)
         try:
@@ -134,48 +139,19 @@ class Searcher:
             
                 #寫入字典
                 courses[course_name] = tuple(course_properties)
-            
-            succeed = True
 
         except  TimeoutException as e:
-            ...
+            return None
 
-        #回復設定
-        choose_time.click()
-        class_time_chk = self.wait.until(EC.visibility_of_element_located((By.NAME, f"daytime_{time_slot}")))
-        class_time_chk.click()
-        jqi_state0_buttonOk = self.wait.until(EC.visibility_of_element_located((By.NAME, "jqi_state0_buttonOk")))
-        jqi_state0_buttonOk.click()
-        chkOption = self.wait.until(EC.element_to_be_clickable((By.ID, "chkOption")))
-        sleep(1)
-        chkOption.click()
-        ym_campus_chk.click()
-        chkCampus.click()
-
-        if succeed:
-            return courses
-        
-        return None
-
-    def quit(self) -> None:
-        '''
-        關閉driver
-        '''
-        self.driver.quit()
+        return courses
 
 def main():
-    searcher = Searcher()
-    try:
+    with Searcher() as searcher:
         print(searcher.get_courses("M5"))
         print(searcher.get_courses("T5"))
         print(searcher.get_courses("W5"))
         print(searcher.get_courses("R5"))
         print(searcher.get_courses("F5"))
-    except Exception as e:
-        print(e)
-    #driver一定要被正常關閉，否則下次運行絕對會出bug
-    finally:
-        searcher.quit()
 
 if __name__ == "__main__":
     main()

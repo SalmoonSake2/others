@@ -32,17 +32,7 @@ class Searcher:
     該類的功能是負責進行網路爬蟲，彙整資料並提交
     '''
     def __init__(self) -> None:
-
-        #陽明課程時間表的網頁
-        self.url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
-
-        self.__activate_driver()
-
-    def __enter__(self) -> 'Searcher':
-        return self
-
-    def __exit__(self,type,value,traceback) -> None:
-        self.driver.quit()
+        pass
 
     def __activate_driver(self) -> None:
         '''
@@ -117,9 +107,10 @@ class Searcher:
         #按下搜尋按鈕
         crstime_search = self.wait.until(EC.visibility_of_element_located((By.ID, "crstime_search")))
         crstime_search.click()
+        succeed = False
 
         #從網頁中篩選出課程列表物件
-        sleep(2)
+        sleep(3)
         try:
             td_elements = self.wait.until(EC.presence_of_all_elements_located((By.XPATH, '//td[@name="cos_name"]')))
             #建立儲存課程的字典
@@ -139,19 +130,49 @@ class Searcher:
             
                 #寫入字典
                 courses[course_name] = tuple(course_properties)
+            succeed = True
 
         except  TimeoutException as e:
-            return None
+            ...
 
-        return courses
+        #回復設定
+        choose_time.click()
+        class_time_chk = self.wait.until(EC.visibility_of_element_located((By.NAME, f"daytime_{time_slot}")))
+        class_time_chk.click()
+        jqi_state0_buttonOk = self.wait.until(EC.visibility_of_element_located((By.NAME, "jqi_state0_buttonOk")))
+        jqi_state0_buttonOk.click()
+        chkOption = self.wait.until(EC.element_to_be_clickable((By.ID, "chkOption")))
+        sleep(1)
+        chkOption.click()
+        ym_campus_chk.click()
+        chkCampus.click()
+
+        if succeed:
+            return courses
+        
+        return None
+    
+    def __enter__(self):
+        #陽明課程時間表的網頁
+        self.url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
+        self.__activate_driver()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        '''
+        關閉driver
+        '''
+        self.driver.quit()
 
 def main():
     with Searcher() as searcher:
-        print(searcher.get_courses("M5"))
-        print(searcher.get_courses("T5"))
-        print(searcher.get_courses("W5"))
-        print(searcher.get_courses("R5"))
-        print(searcher.get_courses("F5"))
+        l = ["M5","T5","W5","R5","F5"]
+        try:
+            for i in l:
+                print(searcher.get_courses(i))
+            
+        except Exception as e:
+            print(e)
 
 if __name__ == "__main__":
     main()

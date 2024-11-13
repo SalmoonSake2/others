@@ -110,7 +110,7 @@ class Searcher:
         succeed = False
 
         #從網頁中篩選出課程列表物件
-        sleep(2)
+        sleep(3)
         try:
             td_elements = self.wait.until(EC.presence_of_all_elements_located((By.XPATH, '//td[@name="cos_name"]')))
             #建立儲存課程的字典
@@ -154,9 +154,8 @@ class Searcher:
     
     def __enter__(self):
         #陽明課程時間表的網頁
-        url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
+        self.url = "https://timetable.nycu.edu.tw/?flang=zh-tw"
         self.__activate_driver()
-        self.__goto_url(url)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:

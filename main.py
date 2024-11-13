@@ -9,11 +9,11 @@ main.py
 作者
 -------------------------------------------------
 Salmoon Sake
-...
+在此感謝 曾宗宣 的協助，建議將其改為更易使用的Context Maneger
 
 版本資訊
 -------------------------------------------------
-v1.0
+v1.1
 '''
 from time import sleep
 
@@ -77,6 +77,8 @@ class Searcher:
         if time_slot[1] not in "yz1234n56789abcd":
             raise Exception("不存在的時段代碼")
 
+        self.__goto_url(self.url)
+
         #設置為陽明校區
         chkCampus = self.wait.until(EC.visibility_of_element_located((By.ID, "chkCampus")))
         chkCampus.click()
@@ -105,7 +107,6 @@ class Searcher:
         #按下搜尋按鈕
         crstime_search = self.wait.until(EC.visibility_of_element_located((By.ID, "crstime_search")))
         crstime_search.click()
-
         succeed = False
 
         #從網頁中篩選出課程列表物件
@@ -129,7 +130,6 @@ class Searcher:
             
                 #寫入字典
                 courses[course_name] = tuple(course_properties)
-            
             succeed = True
 
         except  TimeoutException as e:

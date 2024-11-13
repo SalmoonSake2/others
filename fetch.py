@@ -3,7 +3,6 @@ from time import sleep
 from typing import Literal, Union, get_args
 import pandas as pd
 import requests
-from azustock.core.quote_opti import process_time
 
 def to_txt(text, file_path: str= "output.txt", encoding: str='utf-8') -> None:
     """
@@ -38,7 +37,6 @@ class fetcher:
                 ret_l.append(d + t)
         return ret_l
 
-    @process_time()
     def fetch(self,
               costype: dict | None = None,
               full_file_name: str = 'timetable.xlsx') -> pd.DataFrame:

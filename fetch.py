@@ -39,7 +39,8 @@ class fetcher:
 
     def fetch(self,
               costype: dict | None = None,
-              full_file_name: str = 'timetable.xlsx') -> pd.DataFrame:
+              full_file_name: str = 'timetable.xlsx',
+              progress_bar: bool = True) -> pd.DataFrame:
         
         url = "https://timetable.nycu.edu.tw"
         
@@ -54,7 +55,7 @@ class fetcher:
         df_all = pd.DataFrame()
         process_bar = [0,len(run_dic)]
         for key in run_dic:
-            print(f"\rFetch {key}: {process_bar[0]}/{process_bar[1]}            ",end="")
+            if progress_bar: print(f"\rFetch {key}: {process_bar[0]}/{process_bar[1]}            ",end="")
             process_bar[0] += 1
 
             payload = {"m_acy": 113,
@@ -100,16 +101,20 @@ class fetcher:
 
                 df_raw = pd.DataFrame(dic_data)
                 df = df_raw.T
-                df['課程屬性'] = [""]*df.shape[0]
+                df['課程屬性'] = [key]*df.shape[0]
                 df['屬性'] = [key]*df.shape[0]
                 df.reset_index(inplace=True)
                 for i in df.index:
                     try:
-                        df.loc[i, '課程屬性'] = df_brief.loc[df_brief['code'] == df.loc[i, 'index'], "data"].values[0]
+                        data = df_brief.loc[df_brief['code'] == df.loc[i, 'index'], "data"].values[0]
+                        if data == "":
+                            df.loc[i, '課程屬性'] = key
+                        else:
+                            df.loc[i, '課程屬性'] = data
                     except IndexError:
-                        df.loc[i, '課程屬性'] = None
+                        pass
                 df_all = pd.concat([df_all, df])
-        print(f"\rFetch {key}: {process_bar[0]}/{process_bar[1]}            ",end="")
+        if progress_bar: print(f"\rFetch {key}: {process_bar[0]}/{process_bar[1]}            ",end="")
         df_all.drop_duplicates(subset=['index','cos_id','cos_code'],inplace=True,ignore_index=True)
         typ = full_file_name.split('.')[-1]
         match typ:
@@ -117,7 +122,7 @@ class fetcher:
                 df_all.to_excel(f"{full_file_name}")
             case _ as e:
                 raise ValueError(f"'{e}' is not a valid type")
-        print(f"\rFetch 完成: {process_bar[1]}/{process_bar[1]}            ")
+        if progress_bar: print(f"\rFetch 完成: {process_bar[1]}/{process_bar[1]}            ")
         return df_all
 
 if __name__ == "__main__":

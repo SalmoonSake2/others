@@ -125,7 +125,66 @@ class fetcher:
         if progress_bar: print(f"\rFetch 完成: {process_bar[1]}/{process_bar[1]}            ")
         return df_all
 
+    def fetch_by_date(self,
+              time_l: Union['fetcher.FetchTimeType', list[str], None] = None,
+              date_l: Union['fetcher.FetchDateType', list[str], None] = None,
+              full_file_name: str = 'timetable.xlsx') -> pd.DataFrame:
+        
+        url = "https://timetable.nycu.edu.tw"
+        
+        params = {
+        "r": "main/get_cos_list"
+        }
+        combine_l = self.__combine_time(time_l, date_l)
+        slic = 7
+        run_l = [combine_l[i:i+slic] for i in range(0, len(combine_l), slic)]
+        df_all = pd.DataFrame()
+        for m_crstimes in run_l:
+            m_crstime = ",".join(str(i) for i in m_crstimes)
+            payload = {"m_acy": 113,
+            "m_sem": 1,
+            "m_acyend": 113,
+            "m_semend": 1,
+            "m_dep_uid": "**",
+            "m_group": "**",
+            "m_grade": "**",
+            "m_class": "**",
+            "m_option": "crstime",
+            "m_crsname": "**",
+            "m_teaname": "**",
+            "m_cos_id": "**",
+            "m_cos_code": "**",
+            "m_crstime": m_crstime,
+            "m_crsoutline": "**",
+            "m_costype": "**",
+            "m_selcampus": "**"}
+            res = requests.post(url,params=params, data=payload,headers=self.headers)
+            js = res.json()
+            dic_data = {}
+            for key in js:
+                sub_js = js[key]["1"]
+                bridf_key1 = list(js[key]["brief"].keys())[0]
+                bridf_key2 = list(js[key]["brief"][bridf_key1].keys())[0]
+                bridf_val = js[key]['brief'][bridf_key1][bridf_key2]['brief']
+                sub_js[list(sub_js.keys())[0]]['brief'] = bridf_val
+                dic_data = dic_data | sub_js
+                
+            df_raw = pd.DataFrame(dic_data)
+            df = df_raw.T
+            df_all = pd.concat([df_all, df])
+        df_all.reset_index(inplace=True)
+        df_all.drop_duplicates(['index'], inplace=True, ignore_index=True)
+        
+        typ = full_file_name.split('.')[-1]
+        match typ:
+            case 'xlsx':
+                df_all.to_excel(full_file_name)
+            case _ as e:
+                raise ValueError(f"'{e}' is not a valid type")
+        return df_all
+
+
 if __name__ == "__main__":
     f = fetcher()
-    f.fetch()
+    f.fetch_by_date(full_file_name="timetableDate2.xlsx")
     pass

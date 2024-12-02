@@ -12,7 +12,6 @@ import re
 from typing import Literal, Union, get_args # type annotation
 import pandas as pd # 資料處理用
 import requests # 資料獲取用
-import warnings
 
 class fetcher:
     """
@@ -68,21 +67,20 @@ class fetcher:
     def __time_slicer(self, data: str):
         pattern = r"([A-Za-z0-9]+)|-([A-Z0-9]+)|\[([A-Z]+)\]"
         l = data.split(",")
-        base = {'time': [], 'class': [], "campus": []}
+        base = {"time": [], "class": [], "campus": []}
         for string in l:
             #print(string)
             matches = re.findall(pattern, string)
             for m in matches:
                 if m[0]: base["time"].append(self.__time_setter(m[0]))
-                if m[1]: base['class'].append(m[1])
-                if m[2]: base['campus'].append(m[2])
+                if m[1]: base["class"].append(m[1])
+                if m[2]: base["campus"].append(m[2])
         
         return base
 
-    def __pre(self, df: pd.DataFrame):
-        #df = pd.read_excel("timetableDate.xlsx")
-        df["cos_data"] = df["cos_time"].apply(self.__time_slicer)
-        return df
+    def __pre(self, df: pd.Series):
+        df_s = df.apply(self.__time_slicer)
+        return df_s
 
     def fetch_by_date(self,
               time_l: Union['fetcher.FetchTimeType', list[str], None] = None,
@@ -115,8 +113,10 @@ class fetcher:
         
         # 獲取資料處理
         df_all = pd.DataFrame()
-        for m_crstimes in run_l:
-            print(m_crstimes)
+        lenth = len(run_l)
+        for i in range(lenth):
+            m_crstimes = run_l[i]
+            print(f"\rGet data: {i}/{lenth} ", end="") #pregress bar
             # 獲取資料參數
             m_crstime = ",".join(str(i) for i in m_crstimes)
             payload = {"m_acy": acyend,
@@ -148,7 +148,7 @@ class fetcher:
                 costype_keys = list(js[key]["costype"].keys())
                 for cos_key in costype_keys:
                     inner_coctype_keys = js[key]["costype"][cos_key]
-                    cos_val = ",".join(list(inner_coctype_keys.keys()))
+                    cos_val = [in_key.split("_")[0] for in_key in inner_coctype_keys.keys()]
                     sub_js[cos_key]["brief"] = cos_val
 
                 dic_data = dic_data | sub_js
@@ -161,20 +161,21 @@ class fetcher:
         # 併入資料格式處理，重設index、去除重複資料
         df_all.reset_index(inplace=True)
         df_all.drop_duplicates(['index'], inplace=True, ignore_index=True)
-        df_ret: pd.DataFrame = self.__pre(df_all)
-        
+        df_all["cos_data"] = self.__pre(df_all["cos_time"])
+        print(f"\rGet data: {lenth}/{lenth} ", end="") #pregress bar
+
         # 偵測檔名是否支援
         typ = full_file_name.split('.')[-1]
         match typ:
             case 'xlsx':
-                df_ret.to_excel(full_file_name)
+                df_all.to_excel(full_file_name)
             case _ as e:
                 raise ValueError(f"'{e}' is not a valid type")
-        return df_ret
+        return df_all
 
 
 
 if __name__ == "__main__":
     f = fetcher()
-    df = f.fetch_by_date()
+    df = f.fetch_by_date(full_file_name='timetableDate.xlsx')
     pass

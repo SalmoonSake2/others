@@ -8,6 +8,7 @@ Salmoon Sake
 '''
 
 
+import re
 from typing import Literal, Union, get_args # type annotation
 import pandas as pd # 資料處理用
 import requests # 資料獲取用
@@ -53,116 +54,39 @@ class fetcher:
                 ret_l.append(d + t)
         return ret_l
 
-    def fetch(self,
-              costype: dict | None = None,
-              full_file_name: str = 'timetable.xlsx',
-              progress_bar: bool = True) -> pd.DataFrame:
-        """
-        擷取實作: 課程類型
+    def __time_setter(self, string):
+        ret_str = ""
+        temp = ""
+        for j in string:
+            if j in  list(get_args(fetcher.FetchDateType)):
+                temp = j
+            else:
+                ret_str += temp + j
+        return ret_str
 
-        :param costype: 獲取資料範圍
-        :param full_file_name: 輸出資料檔名
-        :param progress_bar: 進度條顯示與否
-        :return: :class:`pandas <DataFrame>` object
-        :rtype: pandas.DataFrame
-        """
+    def __time_slicer(self, data: str):
+        pattern = r"([A-Za-z0-9]+)|-([A-Z0-9]+)|\[([A-Z]+)\]"
+        l = data.split(",")
+        base = {"time": [], "class": [], "campus": []}
+        for string in l:
+            #print(string)
+            matches = re.findall(pattern, string)
+            for m in matches:
+                if m[0]: base["time"].append(self.__time_setter(m[0]))
+                if m[1]: base["class"].append(m[1])
+                if m[2]: base["campus"].append(m[2])
         
-        # 參數設定
-        url = "https://timetable.nycu.edu.tw"
-        params = {
-        "r": "main/get_cos_list"
-        }
-        if costype is None:
-            costype = fetcher.Fetchcostype_dic
-        elif not isinstance(costype, (dict)):
-            raise TypeError("'costype' must be a 'dict'.")
-        
-        # 獲取資料處理
-        run_dic = costype
-        df_all = pd.DataFrame()
-        process_bar = [0,len(run_dic)]
-        for key in run_dic:
-            if progress_bar: print(f"\rFetch {key}: {process_bar[0]}/{process_bar[1]}            ",end="")
-            process_bar[0] += 1
+        return base
 
-            # requests 參數
-            payload = {"m_acy": 113,
-            "m_sem": 1,
-            "m_acyend": 113,
-            "m_semend": 1,
-            "m_dep_uid": "**",
-            "m_group": "**",
-            "m_grade": "**",
-            "m_class": "**",
-            "m_option": "costype",
-            "m_crsname": "**",
-            "m_teaname": "**",
-            "m_cos_id": "**",
-            "m_cos_code": "**",
-            "m_crstime": "**",
-            "m_crsoutline": "**",
-            "m_costype": run_dic[key],
-            "m_selcampus": "**"}
-
-            # 獲取資料，並設成dict
-            res = requests.post(url,params=params, data=payload,headers=self.headers)
-            js = res.json()
-            
-            # 資料分層處理(嵌套)
-            dic_data = {}
-            df_brief = pd.DataFrame()
-            for js_key in js:
-                for sub_key in js[js_key]:
-                    # 依資料名稱處理
-                    try:
-                        int(sub_key)
-                        sub_js = js[js_key][sub_key]
-                        dic_data = dic_data | sub_js
-                        
-                    except ValueError:
-                        if sub_key == 'brief':
-                            for dic_key in js[js_key]["brief"]:
-                                d = js[js_key]["brief"][dic_key]
-                                for hi in d:
-                                    result = {"code": dic_key, "data": d[hi]['brief']}
-                                    df_brief = pd.concat([df_brief, pd.DataFrame(result, index=[0])], ignore_index=True)
-
-                # dict to DataFrame
-                df_raw = pd.DataFrame(dic_data)
-                df = df_raw.T
-                df['課程屬性'] = [key]*df.shape[0]
-                df['屬性'] = [key]*df.shape[0]
-                df.reset_index(inplace=True)
-
-                # 資料合併
-                for i in df.index:
-                    try:
-                        data = df_brief.loc[df_brief['code'] == df.loc[i, 'index'], "data"].values[0]
-                        if data == "":
-                            df.loc[i, '課程屬性'] = key
-                        else:
-                            df.loc[i, '課程屬性'] = data
-                    except IndexError:
-                        pass
-                df_all = pd.concat([df_all, df]) # 併入資料
-        if progress_bar: print(f"\rFetch {key}: {process_bar[0]}/{process_bar[1]}            ",end="")
-
-        # 併入資料格式處理，重設index、去除重複資料
-        df_all.drop_duplicates(subset=['index','cos_id','cos_code'],inplace=True,ignore_index=True)
-        typ = full_file_name.split('.')[-1]
-
-        # 偵測檔名是否支援
-        match typ:
-            case 'xlsx':
-                df_all.to_excel(f"{full_file_name}")
-            case _ as e:
-                raise ValueError(f"'{e}' is not a valid type")
-        if progress_bar: print(f"\rFetch 完成: {process_bar[1]}/{process_bar[1]}            ")
-        return df_all
+    def __pre(self, df: pd.Series):
+        df_s = df.apply(self.__time_slicer)
+        return df_s
 
     def fetch_by_date(self,
               time_l: Union['fetcher.FetchTimeType', list[str], None] = None,
               date_l: Union['fetcher.FetchDateType', list[str], None] = None,
+              acyend: int = 113,
+              semend: int = 1,
               full_file_name: str = 'timetableDate.xlsx') -> pd.DataFrame:
         """
         擷取實作: 依時間獲取
@@ -189,14 +113,16 @@ class fetcher:
         
         # 獲取資料處理
         df_all = pd.DataFrame()
-        for m_crstimes in run_l:
-
+        lenth = len(run_l)
+        for i in range(lenth):
+            m_crstimes = run_l[i]
+            print(f"\rGet data: {i}/{lenth} ", end="") #pregress bar
             # 獲取資料參數
             m_crstime = ",".join(str(i) for i in m_crstimes)
-            payload = {"m_acy": 113,
-            "m_sem": 1,
-            "m_acyend": 113,
-            "m_semend": 1,
+            payload = {"m_acy": acyend,
+            "m_sem": semend,
+            "m_acyend": acyend,
+            "m_semend": semend,
             "m_dep_uid": "**",
             "m_group": "**",
             "m_grade": "**",
@@ -219,10 +145,12 @@ class fetcher:
             dic_data = {}
             for key in js:
                 sub_js = js[key]["1"]
-                bridf_key1 = list(js[key]["brief"].keys())[0]
-                bridf_key2 = list(js[key]["brief"][bridf_key1].keys())[0]
-                bridf_val = js[key]['brief'][bridf_key1][bridf_key2]['brief']
-                sub_js[list(sub_js.keys())[0]]['brief'] = bridf_val
+                costype_keys = list(js[key]["costype"].keys())
+                for cos_key in costype_keys:
+                    inner_coctype_keys = js[key]["costype"][cos_key]
+                    cos_val = [in_key.split("_")[0] for in_key in inner_coctype_keys.keys()]
+                    sub_js[cos_key]["brief"] = cos_val
+
                 dic_data = dic_data | sub_js
             
             # dict to DataFrame
@@ -233,7 +161,9 @@ class fetcher:
         # 併入資料格式處理，重設index、去除重複資料
         df_all.reset_index(inplace=True)
         df_all.drop_duplicates(['index'], inplace=True, ignore_index=True)
-        
+        df_all["cos_data"] = self.__pre(df_all["cos_time"])
+        print(f"\rGet data: {lenth}/{lenth} ", end="") #pregress bar
+
         # 偵測檔名是否支援
         typ = full_file_name.split('.')[-1]
         match typ:
@@ -244,7 +174,8 @@ class fetcher:
         return df_all
 
 
+
 if __name__ == "__main__":
     f = fetcher()
-    f.fetch_by_date()
+    df = f.fetch_by_date(full_file_name='timetableDate.xlsx')
     pass
